@@ -36,28 +36,46 @@ COLD:
 Base Operations:
 
 0x00: MVI: Move Inmediate: EncodeC
+
 0x01: MOV: Move Registers: EncodeB
+
 0x02: ADD: Add Registers and Inmediate: EncodeC
+
 0x03: SUB: Sub Registers and Inmediate: EncodeA
+
 0x04: AND: Logical AND on Registers and Inmediate: EncodeC
+
 0x05: IOR: Logical OR on Registers and Inmediate: EncodeC
+
 0x06: NOT: Logical Not on Register: EncodeA
+
 0x07: LDM: Load Memory to Register at Register Plus Inmediate: EncodeC
+
 0x08: STM: Store Memory from Register at Register Plus Inmediate: EncodeC
+
 0x09: SHL: Logical Shift Left on Registers and Inmediate: EncodeC
+
 0x0A: SHR: MLogical Shift Right on Registers and Inmediate: EncodeC
+
 0x0B: CMP: Comparison Between Registers: EncodeA
+
 0x0C: JMP: Jump from Register Plus Inmediate: EncodeC
+
 0x0D: BRN: Branch from Register Plus Inmdeiate: EncodeC
+
 0x0E: TGL: Toggle Bit on Register: EncodeA
+
 0x0F: SYS: Syscall: EncodeA
+
 
 Encodings:
 
 A:
 Opcode [15:12] | rX [11:10] | rY [9:8]
+
 B:
 Opcode [15:12] | 0 [11:8] | rX [7:4] | rY [3:0]
+
 C:
 Opcode [15:12] | rX [11:10] | rY [9:8] | Inm [7:0]
 
