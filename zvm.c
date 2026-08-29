@@ -16,9 +16,19 @@ const unsigned char debug = 1;
 unsigned char interrupt = 0;
 unsigned short interruptVector = 0;
 
+#define RUNTIME 0x80
+#define INTERUPTED 0x40
+#define MMUACTVE 0x20
+#define PROTECTED 0x10
+
+#define UD0 0x08
+#define UD1 0x04
+#define POSITIVE 0x02
+#define EQUALS 0x01
+
 void injectInterrupt(unsigned short intId)
 {
-	if (FL & 32 || !iointreg)
+	if (FL & INTERUPTED || !iointreg)
 		return;
 
 	interrupt = 1;
@@ -34,7 +44,7 @@ unsigned char memory[memsize] = {0};
 
 unsigned char vmmemget(unsigned short address)
 {
-	if (!(FL & 64))
+	if (!(FL & MMUACTVE))
 	{
 		if (address < memsize)
 			return memory[address];
@@ -68,7 +78,7 @@ unsigned char vmmemget(unsigned short address)
 				injectInterrupt(0);
 				do
 					vmExecute();
-				while (FL & 32);
+				while (FL & INTERUPTED);
 				return registers[0];
 			}
 		}
@@ -80,7 +90,7 @@ unsigned char vmmemget(unsigned short address)
 }
 void vmmemset(unsigned short address, unsigned char value)
 {
-	if (!(FL & 64))
+	if (!(FL & MMUACTVE))
 	{
 		if (address < memsize)
 		{
@@ -122,7 +132,7 @@ void vmmemset(unsigned short address, unsigned char value)
 				vmmemset(registers[SPI]--, value);
 				do
 					vmExecute();
-				while (FL & 32);
+				while (FL & INTERUPTED);
 				return;
 			}
 		}
@@ -156,34 +166,35 @@ static inline void opmov(unsigned char rX, unsigned char rY)
 	unsigned char rEX = (LIR >> 4);
 	unsigned char rEY = (LIR & 0x0f);
 
-	//if(FL & P && rEX == TP) return;
+	if (FL & PROTECTED && rEX == TP)
+		return;
 
 	registers[rEX] = registers[rEY];
 }
 
 static inline void opadd(unsigned char rX, unsigned char rY)
 {
-	registers[rX] += (registers[rY]+LIR);
+	registers[rX] += (registers[rY] + LIR);
 }
 
 static inline void opsub(unsigned char rX, unsigned char rY)
 {
-	registers[rX] -= (registers[rY]+LIR);
+	registers[rX] -= (registers[rY] + LIR);
 }
 
 static inline void opand(unsigned char rX, unsigned char rY)
 {
-	registers[rX] &= (registers[rY]+LIR);
+	registers[rX] &= (registers[rY] + LIR);
 }
 
 static inline void opior(unsigned char rX, unsigned char rY)
 {
-	registers[rX] |= (registers[rY]+LIR);
+	registers[rX] |= (registers[rY] + LIR);
 }
 
 static inline void opnot(unsigned char rX, unsigned char rY)
 {
-	registers[rX] = ~(registers[rX]+LIR);
+	registers[rX] = ~(registers[rX] + LIR);
 }
 
 static inline void opldm(unsigned char rX, unsigned char rY)
@@ -208,8 +219,8 @@ static inline void opshr(unsigned char rX, unsigned char rY)
 
 static inline void opcmp(unsigned char rX, unsigned char rY)
 {
-	FL = (FL & 0xFE) | (registers[rX] == registers[rY]);
-	FL = (FL & 0xFD) | (registers[rX] > registers[rY]);
+	FL = (FL & ~EQUALS) | (registers[rX] == registers[rY]);
+	FL = (FL & ~POSITIVE) | (registers[rX] > registers[rY]);
 }
 
 static inline void opjmp(unsigned char rX, unsigned char rY)
@@ -237,25 +248,25 @@ static inline void opbrn(unsigned char rX, unsigned char rY)
 	const void *label[] = {&&ebrn, &&qbrn, &&pbrn, &&nbrn};
 	goto *label[rX];
 ebrn:
-	if (FL & 1)
+	if (FL & EQUALS)
 		registers[IP] = registers[rY] + LIR;
 	else
 		registers[IP] += 2;
 	return;
 qbrn:
-	if (!(FL & 1))
+	if (!(FL & EQUALS))
 		registers[IP] = registers[rY] + LIR;
 	else
 		registers[IP] += 2;
 	return;
 pbrn:
-	if (FL & 2)
+	if (FL & POSITIVE)
 		registers[IP] = registers[rY] + LIR;
 	else
 		registers[IP] += 2;
 	return;
 nbrn:
-	if (!(FL & 2))
+	if (!(FL & POSITIVE))
 		registers[IP] = registers[rY] + LIR;
 	else
 		registers[IP] += 2;
@@ -297,7 +308,7 @@ static inline void opsys(unsigned char rX, unsigned char rY)
 		registers[rY] = FL;
 		break;
 	case 0xFF:
-		if (FL & 16)
+		if (FL & PROTECTED)
 		{
 			FL &= 0xF0;
 			FL |= (registers[rY] & 0x000F);
@@ -316,12 +327,13 @@ static inline void opsys(unsigned char rX, unsigned char rY)
 
 		registers[IP] = ((vmmemget(registers[TP]) << 8) | vmmemget(registers[TP] + 1)) - 2; // substract 2 to avoid jumping 1 instruction
 
+		// I cannot emember how is this supposed to detect corrupted runtimes
 		if (!(interruptVector & 0x0010) &&
 			((interruptVector & 0x1000) >> 12) <= 1 &&
 			!interrupt)
 			return; // avoid entering real mode with corrupted runtime.
 
-		FL &= ~16; // clear user mode
+		FL &= ~PROTECTED; // clear user mode
 
 		break;
 	}
@@ -456,8 +468,8 @@ static inline void vmExecute()
 		vmmemset(registers[SPI]--, ((unsigned char *)registers)[(1 << 1) + 1]);
 		vmmemset(registers[SPI], FL);
 
-		FL &= ~16;
-		FL |= 32;
+		FL &= ~PROTECTED;
+		FL |= INTERUPTED;
 
 		registers[IP] = ((vmmemget(registers[TP] + 2) << 8) | vmmemget(registers[TP] + 3));
 	}
@@ -481,13 +493,13 @@ int main(int argc, char **argv)
 	for (int i = 1; i < argc; i++)
 	{
 		FILE *file = fopen(argv[i], "rb");
-		fread(memory+eoc, 1, memsize, file);
+		fread(memory + eoc, 1, memsize, file);
 		eoc += ftell(file);
 		fclose(file);
 	}
-	FL = 0b10000000;
+	FL = RUNTIME;
 
-	while (FL & 0x80)
+	while (FL & RUNTIME)
 	{
 		if (!debug)
 		{
