@@ -1,0 +1,3 @@
+Here is containde all pice of software, Including AI generated spinets (Tools, like installers, or IO exampes) ever created for ZVM.
+
+AI Generated code was NEVER used inside the ZVM Core code, and any important code at all. Specific examples are the makefiles of some places, Shell Installers, and Some IO Models.
