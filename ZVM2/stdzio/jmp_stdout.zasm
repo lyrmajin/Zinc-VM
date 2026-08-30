@@ -1,0 +1,137 @@
+putchar:
+        PUSH R1         ; char
+        MVI R0, #0x0000
+        PUSH R0
+
+        ;Write syscall arg addres of STDOUT
+        MVI R0, #0x00C6
+        PUSH R0
+        MVI R0, #0x0000
+        PUSH R0
+
+        MVI R0, #0x0007
+        SYS R0, R0      ; SysGetSP
+
+        MVI R0, #0x0001
+        ADD R3, R0      ; Set SPI to last pushed value
+        MOV R2, R3
+
+        MVI R0, #0x00C0
+        PUSH R0
+        MVI R0, #0x0000
+        PUSH R0
+
+        loop_wait:
+            MVI R0, #0x0007
+            SYS R0, R0      ; SysGetSP
+
+            MVI R0, #0x0001
+            ADD R3, R0
+
+            MOV R0, R3
+            
+            MVI R1, #0x0001
+            SYS R1, R0
+            MVI R1, #0x0020
+
+            AND R3, R1
+            CMP R3, R1
+            RBRQ loop_wait_b
+            RBRE outloop
+        
+        loop_wait_b:
+            NJMP loop_wait
+
+    outloop:
+
+        POP R0
+        POP R0
+
+        MVI R1, #0x0000 ; SysWrite to STDOUT
+        SYS R1, R2
+
+        MVI R0, #0x0000
+        MVI R1, #0x0000
+        MVI R2, #0x0000
+        MVI R3, #0x0000
+
+        RET
+
+    set_stdout:
+        set_UBRR0H:
+        MVI R0, #0x0000
+        PUSH R0
+        MVI R0, #0x0000
+        PUSH R0
+        MVI R0, #0x00C5
+        PUSH R0
+        MVI R0, #0x0000
+        PUSH R0
+
+        MVI R0, #0x0007
+        SYS R0, R0      ; SysGetSP
+
+        MVI R0, #0x0001
+        ADD R3, R0
+
+        MVI R0, #0x0000
+        SYS R0, R3      ;write to UBRR0H
+
+        set_UBRR0L:
+        MVI R0, #0x0067
+        PUSH R0
+        MVI R0, #0x0000
+        PUSH R0
+        MVI R0, #0x00C4
+        PUSH R0
+        MVI R0, #0x0000
+        PUSH R0
+
+        MVI R0, #0x0007
+        SYS R0, R0      ; SysGetSP
+
+        MVI R0, #0x0001
+        ADD R3, R0
+
+        MVI R0, #0x0000
+        SYS R0, R3      ;write to UBRR0L
+
+        set_UCSR0C:
+        MVI R0, #0x0006
+        PUSH R0
+        MVI R0, #0x0000
+        PUSH R0
+        MVI R0, #0x00C2
+        PUSH R0
+        MVI R0, #0x0000
+        PUSH R0
+
+        MVI R0, #0x0007
+        SYS R0, R0      ; SysGetSP
+
+        MVI R0, #0x0001
+        ADD R3, R0
+
+        MVI R0, #0x0000
+        SYS R0, R3      ;write to UCSR0C
+
+        set_UCSR0B:
+        MVI R0, #0x0008
+        PUSH R0
+        MVI R0, #0x0000
+        PUSH R0
+        MVI R0, #0x00C1
+        PUSH R0
+        MVI R0, #0x0000
+        PUSH R0
+
+        MVI R0, #0x0007
+        SYS R0, R0      ; SysGetSP
+
+        MVI R0, #0x0001
+        ADD R3, R0
+
+        MVI R0, #0x0000
+        SYS R0, R3      ;write to UCSR0B
+
+        RET

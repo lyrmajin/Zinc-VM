@@ -1,0 +1,36 @@
+.org:0x21
+.code:
+    start:
+        CALL set_stdout
+        MVI R1, #0x0048
+        CALL putchar
+        MVI R1, #0x0065
+        CALL putchar
+        MVI R1, #0x006C
+        CALL putchar
+        MVI R1, #0x006C
+        CALL putchar
+        MVI R1, #0x006F
+        CALL putchar
+        MVI R1, #0x002C
+        CALL putchar
+        MVI R1, #0x0020
+        CALL putchar
+        MVI R1, #0x0057
+        CALL putchar
+        MVI R1, #0x006F
+        CALL putchar
+        MVI R1, #0x0072
+        CALL putchar
+        MVI R1, #0x006C
+        CALL putchar
+        MVI R1, #0x0064
+        CALL putchar
+        MVI R1, #0x0021
+        CALL putchar
+        MVI R1, #0x0000
+        CALL putchar
+        MVI R1, #0x000A
+        CALL putchar
+        MVI R1, #0x000A ; kill
+        SYS R1, R1
