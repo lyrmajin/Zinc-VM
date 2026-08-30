@@ -1,0 +1,5 @@
+main:
+MVI R0, #0xF
+MVS [SP WORD], R0
+MVS R7, [SP WORD]
+RET
