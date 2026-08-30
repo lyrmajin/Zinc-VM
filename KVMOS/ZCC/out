@@ -1,5 +1,0 @@
-main:
-MVI R0, #0xF
-PUSH R0
-POP R3
-RET
