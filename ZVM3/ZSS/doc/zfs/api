@@ -1,0 +1,241 @@
+# ZFS API
+
+This module provides functions for creating, reading, and writing files and directories in memory, along with cluster management operations. All memory access is abstracted via `memoryget_t` and `memoryset_t` callbacks.
+
+---
+
+## File Creation and Directory Management
+
+### `uint16_t makeFile(char *name, uint16_t size, uint8_t *buffer, uint16_t clusterptr, uint16_t offset, memoryset_t memset, memoryget_t memget);`
+
+Creates a file in memory.
+
+* **Parameters:**
+
+  * `name` – Name of the file (if NULL, no data will be written).
+  * `size` – Size of the file in bytes.
+  * `buffer` – Pointer to file data (if NULL, no data will be written).
+  * `clusterptr` – Pointer to the starting cluster (Most be set to offset if not chaining clusters).
+  * `offset` – Memory offset where the file entry should be created.
+  * `memset` – Callback to write to memory.
+  * `memget` – Callback to read from memory.
+* **Returns:** Offset of the newly created file data start.
+
+---
+
+### `uint8_t makeEntry(uint8_t type, uint16_t address, uint16_t offset, memoryset_t memset, memoryget_t memget);`
+
+Creates a generic directory or file entry.
+
+* **Parameters:**
+
+  * `type` – Entry type (file, directory, etc.).
+  * `address` – Memory address or cluster pointer.
+  * `offset` – Memory offset for the entry (Must file data start).
+  * `memset` – Memory write callback.
+  * `memget` – Memory read callback.
+* **Returns:** Entry index or status code.
+
+---
+
+### `void makeDir(char *name, uint16_t rootptr, uint16_t offset, memoryset_t memset, memoryget_t memget);`
+
+Creates a new directory in memory.
+
+* **Parameters:**
+
+  * `name` – Directory name.
+  * `rootptr` – Pointer to parent/root cluster.
+  * `offset` – Memory offset for the directory.
+  * `memset` – Memory write callback.
+  * `memget` – Memory read callback.
+
+---
+
+## File Entry Access
+
+### `uint16_t getEntryAddress(uint8_t entryindex, uint16_t offset, memoryget_t memget);`
+
+Retrieves the address of a file or directory entry.
+
+* **Parameters:**
+
+  * `entryindex` – Index of the entry.
+  * `offset` – Base offset (Must be file data start).
+  * `memget` – Memory read callback.
+* **Returns:** Memory data address of the entry.
+
+---
+
+### `uint8_t getEntryType(uint8_t entryindex, uint16_t offset, memoryget_t memget);`
+
+Gets the type of an entry (file, directory, etc.).
+
+* **Parameters:**
+  * `entryindex` – Index of the entry.
+  * `offset` – Base offset (Must be file data start).
+  * `memget` – Memory read callback.
+* **Returns:** Entry type as an 8-bit value.
+
+---
+
+### `uint8_t getFileNameSize(uint16_t offset, memoryget_t memget);`
+
+Returns the size of a file name.
+
+* **Parameters:**
+
+  * `offset` – Memory offset of the file.
+  * `memget` – Memory read callback.
+* **Returns:** Name size in bytes.
+
+---
+
+### `uint16_t getFileName(uint16_t offset, memoryget_t memget);`
+
+Returns a file name from the memory offset.
+
+* **Parameters:**
+  * `offset` – Memory offset of the file.
+  * `memget` – Memory read callback.
+* **Returns:** Pointer to file name.
+
+---
+
+### `uint16_t getFileDataSize(uint16_t offset, memoryget_t memget);`
+
+Returns the size of the file’s data.
+
+* **Parameters:**
+  * `offset` – Memory offset of the file.
+  * `memget` – Memory read callback.
+* **Returns:** Size in bytes.
+
+---
+
+### `uint16_t getFileSize(uint16_t offset, memoryget_t memget);`
+
+Returns total file size (including metadata, if applicable).
+
+* **Parameters:**
+  * `offset` – Memory offset of the file.
+  * `memget` – Memory read callback.
+* **Returns:** Total size in bytes.
+
+---
+
+### `uint16_t getFileDataAddress(uint16_t offset, memoryget_t memget);`
+
+Returns memory address of the file’s data.
+
+* **Parameters:**
+  * `offset` – Memory offset of the file.
+  * `memget` – Memory read callback.
+* **Returns:** Data address.
+
+---
+
+### `uint16_t getFileClusterPtr(uint16_t offset, memoryget_t memget);`
+
+Returns cluster pointer associated with a file.
+
+* **Parameters:**
+  * `offset` – Memory offset of the file.
+  * `memget` – Memory read callback.
+* **Returns:** Cluster pointer.
+
+---
+
+## File Data Operations
+
+### `void readFileData(uint8_t *data, uint16_t size, uint16_t offset, memoryget_t memget);`
+
+Reads file data into a buffer.
+
+* **Parameters:**
+
+  * `data` – Destination buffer.
+  * `size` – Number of bytes to read.
+  * `offset` – File data offset.
+  * `memget` – Memory read callback.
+
+---
+
+### `void writeFileData(uint8_t *data, uint16_t size, uint16_t offset, memoryset_t memset, memoryget_t memget);`
+
+Writes data from a buffer to a file.
+
+* **Parameters:**
+
+  * `data` – Source buffer.
+  * `size` – Number of bytes to write.
+  * `offset` – File data offset.
+  * `memset` – Memory write callback.
+  * `memget` – Memory read callback.
+
+---
+
+## Cluster Management
+
+### `uint16_t getClusterDataSize(uint16_t offset, memoryget_t memget);`
+
+* **Parameters:**
+  * `offset` – Memory offset of the cluster.
+  * `memget` – Memory read callback.
+* **Returns:** Size of data in a cluster.
+
+---
+
+### `uint16_t getClusterSize(uint16_t offset, memoryget_t memget);`
+
+* **Parameters:**
+  * `offset` – Memory offset of the cluster.
+  * `memget` – Memory read callback.
+* **Returns:** Total cluster size (data + metadata).
+
+---
+
+### `uint16_t getClusterDataAddress(uint16_t offset, memoryget_t memget);`
+
+* **Parameters:**
+  * `offset` – Memory offset of the cluster.
+  * `memget` – Memory read callback.
+* **Returns:** Memory address of cluster data.
+
+---
+
+### `uint16_t getClusterClusterPtr(uint16_t offset, memoryget_t memget);`
+
+* **Parameters:**
+  * `offset` – Memory offset of the cluster.
+  * `memget` – Memory read callback.
+* **Returns:** Pointer to the next cluster.
+
+---
+
+### `void readClusterData(uint8_t *data, uint16_t size, uint16_t offset, memoryget_t memget);`
+
+Reads data from a cluster into a buffer.
+
+* **Parameters:**
+
+  * `data` – Destination buffer.
+  * `size` – Number of bytes to read.
+  * `offset` – Cluster data offset.
+  * `memget` – Memory read callback.
+
+---
+
+### `void writeClusterData(uint8_t *data, uint16_t size, uint16_t offset, memoryset_t memset, memoryget_t memget);`
+
+Writes buffer data into a cluster.
+
+* **Parameters:**
+
+  * `data` – Source buffer.
+  * `size` – Number of bytes to write.
+  * `offset` – Cluster data offset.
+  * `memset` – Memory write callback.
+  * `memget` – Memory read callback.
+
+---
