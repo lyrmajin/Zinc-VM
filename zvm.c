@@ -21,8 +21,8 @@ unsigned short interruptVector = 0;
 #define MMUACTVE 0x20
 #define PROTECTED 0x10
 
-#define UD0 0x08
-#define UD1 0x04
+#define CARRY 0x08
+#define FLOAT 0x04
 #define POSITIVE 0x02
 #define EQUALS 0x01
 
@@ -44,12 +44,13 @@ unsigned char memory[memsize] = {0};
 
 unsigned char vmmemget(unsigned short address)
 {
+	unsigned int faddress = (MW << 16) | address;
 	if (!(FL & MMUACTVE))
 	{
-		if (address < memsize)
-			return memory[address];
-		else if (address >= memsize && address < iosize)
-			return ioget(address - memsize);
+		if (faddress < memsize)
+			return memory[faddress];
+		else if (faddress >= memsize && faddress < iosize)
+			return ioget(faddress - memsize);
 		injectInterrupt(NMA_ROOB);
 		return 0;
 	}
@@ -60,10 +61,10 @@ unsigned char vmmemget(unsigned short address)
 
 		for (int i = mmupp + 2; i < (mmupp * mmups * 6); i += 6)
 		{
-			if (address > ((memory[i] << 8) | memory[i + 1]) && address < ((memory[i + 2] << 8) | memory[i + 3]))
+			if (faddress > ((memory[i] << 8) | memory[i + 1]) && faddress < ((memory[i + 2] << 8) | memory[i + 3]))
 			{
 				unsigned short itp = ((memory[i + 4] << 8) | memory[i + 5]);
-				return memory[address + itp];
+				return memory[faddress + itp];
 			}
 		}
 
@@ -72,7 +73,7 @@ unsigned char vmmemget(unsigned short address)
 
 		for (int i = mmump + 2; i < (mmump * mmums * 6); i += 6)
 		{
-			if (address > ((memory[i] << 8) | memory[i + 1]) && address < ((memory[i + 2] << 8) | memory[i + 3]))
+			if (faddress > ((memory[i] << 8) | memory[i + 1]) && faddress < ((memory[i + 2] << 8) | memory[i + 3]))
 			{
 				unsigned short itp = ((memory[i + 4] << 8) | memory[i + 5]);
 				injectInterrupt(0);
@@ -90,16 +91,17 @@ unsigned char vmmemget(unsigned short address)
 }
 void vmmemset(unsigned short address, unsigned char value)
 {
+	unsigned int faddress = (MW << 16) | address;
 	if (!(FL & MMUACTVE))
 	{
-		if (address < memsize)
+		if (faddress < memsize)
 		{
-			memory[address] = value;
+			memory[faddress] = value;
 			return;
 		}
-		else if (address >= memsize && address < (memsize + iosize))
+		else if (faddress >= memsize && faddress < (memsize + iosize))
 		{
-			ioset(address - memsize, value);
+			ioset(faddress - memsize, value);
 			return;
 		}
 		injectInterrupt(NMA_WOOB);
@@ -112,10 +114,10 @@ void vmmemset(unsigned short address, unsigned char value)
 
 		for (int i = mmupp + 2; i < (mmupp * mmups * 6); i += 6)
 		{
-			if (address > ((memory[i] << 8) | memory[i + 1]) && address < ((memory[i + 2] << 8) | memory[i + 3]))
+			if (faddress > ((memory[i] << 8) | memory[i + 1]) && faddress < ((memory[i + 2] << 8) | memory[i + 3]))
 			{
 				unsigned short itp = ((memory[i + 4] << 8) | memory[i + 5]);
-				memory[address + itp] = value;
+				memory[faddress + itp] = value;
 				return;
 			}
 		}
@@ -125,7 +127,7 @@ void vmmemset(unsigned short address, unsigned char value)
 
 		for (int i = mmump + 2; i < (mmump * mmums * 6); i += 6)
 		{
-			if (address > ((memory[i] << 8) | memory[i + 1]) && address < ((memory[i + 2] << 8) | memory[i + 3]))
+			if (faddress > ((memory[i] << 8) | memory[i + 1]) && faddress < ((memory[i + 2] << 8) | memory[i + 3]))
 			{
 				unsigned short itp = ((memory[i + 4] << 8) | memory[i + 5]);
 				injectInterrupt(0);
@@ -174,12 +176,94 @@ static inline void opmov(unsigned char rX, unsigned char rY)
 
 static inline void opadd(unsigned char rX, unsigned char rY)
 {
-	registers[rX] += (registers[rY] + LIR);
+	if (FL & FLOAT)
+	{
+		char PrX;
+		char PrY;
+
+		switch (rX)
+		{
+		case 0:
+			PrX = 0;
+			break;
+		case 1:
+			PrX = 2 / 2;
+			break;
+		case 2:
+			PrX = 12 / 2;
+			break;
+		case 3:
+			PrX = 14 / 2;
+			break;
+		}
+
+		switch (rY)
+		{
+		case 0:
+			PrY = 0;
+			break;
+		case 1:
+			PrY = 2 / 2;
+			break;
+		case 2:
+			PrY = 12 / 2;
+			break;
+		case 3:
+			PrY = 14 / 2;
+			break;
+		}
+		((float *)registers)[PrX] += ((float *)registers)[PrY];
+	}
+	else
+	{
+		int a = registers[rX];
+		registers[rX] += (registers[rY] + LIR);
+		FL |= (registers[rX] < a) << 3;
+	}
 }
 
 static inline void opsub(unsigned char rX, unsigned char rY)
 {
-	registers[rX] -= (registers[rY] + LIR);
+	if (FL & FLOAT)
+	{
+		char PrX;
+		char PrY;
+
+		switch (rX)
+		{
+		case 0:
+			PrX = 0;
+			break;
+		case 1:
+			PrX = 2 / 2;
+			break;
+		case 2:
+			PrX = 12 / 2;
+			break;
+		case 3:
+			PrX = 14 / 2;
+			break;
+		}
+
+		switch (rY)
+		{
+		case 0:
+			PrY = 0;
+			break;
+		case 1:
+			PrY = 2 / 2;
+			break;
+		case 2:
+			PrY = 12 / 2;
+			break;
+		case 3:
+			PrY = 14 / 2;
+			break;
+		}
+		((float *)registers)[PrX] -= ((float *)registers)[PrY];
+	}
+	else
+		registers[rX] -= (registers[rY] + LIR);
 }
 
 static inline void opand(unsigned char rX, unsigned char rY)
@@ -199,7 +283,7 @@ static inline void opnot(unsigned char rX, unsigned char rY)
 
 static inline void opldm(unsigned char rX, unsigned char rY)
 {
-	registers[rX] = vmmemget(registers[rY] + LIR);
+	((unsigned char *)registers)[rX << 1] = vmmemget(registers[rY] + LIR);
 }
 
 static inline void opstm(unsigned char rX, unsigned char rY)
@@ -249,33 +333,74 @@ static inline void opbrn(unsigned char rX, unsigned char rY)
 	goto *label[rX];
 ebrn:
 	if (FL & EQUALS)
-		registers[IP] = registers[rY] + LIR;
+		registers[IP] += registers[rY] + LIR;
 	else
 		registers[IP] += 2;
 	return;
 qbrn:
 	if (!(FL & EQUALS))
-		registers[IP] = registers[rY] + LIR;
+		registers[IP] += registers[rY] + LIR;
 	else
 		registers[IP] += 2;
 	return;
 pbrn:
 	if (FL & POSITIVE)
-		registers[IP] = registers[rY] + LIR;
+		registers[IP] += registers[rY] + LIR;
 	else
 		registers[IP] += 2;
 	return;
 nbrn:
 	if (!(FL & POSITIVE))
-		registers[IP] = registers[rY] + LIR;
+		registers[IP] += registers[rY] + LIR;
 	else
 		registers[IP] += 2;
 	return;
 }
 
-static inline void optgl(unsigned char rX, unsigned char rY)
+static inline void opadc(unsigned char rX, unsigned char rY)
 {
-	registers[rX] ^= (1 << registers[rY]);
+	if (FL & FLOAT)
+	{
+		char PrX;
+		char PrY;
+
+		switch (rX)
+		{
+		case 0:
+			PrX = 0;
+			break;
+		case 1:
+			PrX = 8 / 4;
+			break;
+		case 2:
+			PrX = 12 / 4;
+			break;
+		case 3:
+			return;
+		}
+
+		switch (rY)
+		{
+		case 0:
+			PrY = 0;
+			break;
+		case 1:
+			PrY = 8 / 4;
+			break;
+		case 2:
+			PrY = 12 / 4;
+			break;
+		case 3:
+			return;
+		}
+		((double *)registers)[PrX] += ((double *)registers)[PrY];
+		return;
+	}
+
+	unsigned int a = registers[rX];
+	registers[rX] += (registers[rY] + LIR + ((FL & CARRY) >> 3));
+	FL &= ~CARRY;
+	FL |= (registers[rX] < a) << 3;
 }
 
 static inline void opsys(unsigned char rX, unsigned char rY)
@@ -283,17 +408,105 @@ static inline void opsys(unsigned char rX, unsigned char rY)
 	switch (registers[rX])
 	{
 	case 0xF0:
+		char PrX;
+
+		switch (rX)
+		{
+		case 0:
+			PrX = 0;
+			break;
+		case 1:
+			PrX = 8 / 4;
+			break;
+		case 2:
+			PrX = 12 / 4;
+			break;
+		case 3:
+			return;
+		}
+		((float *)registers)[PrX] = (float)registers[rY];
+		break;
 	case 0xF1:
+		char PrY;
+
+		switch (rY)
+		{
+		case 0:
+			PrY = 0;
+			break;
+		case 1:
+			PrY = 2 / 2;
+			break;
+		case 2:
+			PrY = 12 / 2;
+			break;
+		case 3:
+			PrY = 14 / 2;
+			break;
+		}
+		registers[rX] = ((float *)registers)[PrY];
+		break;
 	case 0xF2:
+		char PrX;
+
+		switch (rX)
+		{
+		case 0:
+			PrX = 0;
+			break;
+		case 1:
+			PrX = 8 / 4;
+			break;
+		case 2:
+			PrX = 12 / 4;
+			break;
+		case 3:
+			return;
+		}
+		((double *)registers)[PrX] = (double)registers[rY];
+		break;
 	case 0xF3:
+		char PrY;
+
+		switch (rY)
+		{
+		case 0:
+			PrY = 0;
+			break;
+		case 1:
+			PrY = 8 / 4;
+			break;
+		case 2:
+			PrY = 12 / 4;
+			break;
+		case 3:
+			return;
+		}
+		registers[rX] = ((double *)registers)[PrY];
+		break;
 	case 0xF4:
+		registers[rX] = ioget(registers[rY]);
+		break;
 	case 0xF5:
+		ioset(registers[rY], (unsigned char)LIR);
+		break;
 	case 0xF6:
+		registers[rY] = MW;
+		break;
 	case 0xF7:
+		MW = registers[rY];
+		break;
 	case 0xF8:
+		FL &= ~FLOAT;
+		break;
 	case 0xF9:
+		FL |= FLOAT;
+		break;
 	case 0xFA:
+		FL &= ~CARRY;
+		break;
 	case 0xFB:
+		FL |= CARRY;
 		break;
 	case 0xFC:
 		registers[rY] = interruptVector;
@@ -343,7 +556,7 @@ static inline void dispatch(unsigned char opcode, unsigned char rX, unsigned cha
 {
 	if (debug)
 		printf("IR :0x%02X%02X:", HIR, LIR);
-	const void *label[] = {&&mvi, &&mov, &&add, &&sub, &&and, &&ior, &&not, &&ldm, &&stm, &&shl, &&shr, &&cmp, &&jmp, &&brn, &&tgl, &&sys};
+	const void *label[] = {&&mvi, &&mov, &&add, &&sub, &&and, &&ior, &&not, &&ldm, &&stm, &&shl, &&shr, &&cmp, &&jmp, &&brn, &&adc, &&sys};
 	goto *label[opcode];
 mvi:
 	if (debug)
@@ -359,13 +572,23 @@ mov:
 	return;
 add:
 	if (debug)
-		printf("add r%u, r%u+%d\n", rX, rY, LIR);
+	{
+		if (FL & FLOAT)
+			printf("fadd r%u, r%u+%d\n", rX, rY, LIR);
+		else
+			printf("add r%u, r%u+%d\n", rX, rY, LIR);
+	}
 	opadd(rX, rY);
 	registers[IP] += 2;
 	return;
 sub:
 	if (debug)
-		printf("sub r%u, r%u+%d\n", rX, rY, LIR);
+	{
+		if (FL & FLOAT)
+			printf("fsub r%u, r%u+%d\n", rX, rY, LIR);
+		else
+			printf("sub r%u, r%u+%d\n", rX, rY, LIR);
+	}
 	opsub(rX, rY);
 	registers[IP] += 2;
 	return;
@@ -427,10 +650,15 @@ brn:
 		printf("brn.%u r%u+%d\n", rX, rY, LIR);
 	opbrn(rX, rY);
 	return;
-tgl:
+adc:
 	if (debug)
-		printf("tgl r%u, r%u\n", rX, rY);
-	optgl(rX, rY);
+	{
+		if (FL & FLOAT)
+			printf("fadc r%u, r%u+%d\n", rX, rY, LIR);
+		else
+			printf("adc r%u, r%u+%d\n", rX, rY, LIR);
+	}
+	opadc(rX, rY);
 	registers[IP] += 2;
 	return;
 sys:
@@ -468,7 +696,15 @@ static inline void vmExecute()
 		vmmemset(registers[SPI]--, ((unsigned char *)registers)[(1 << 1) + 1]);
 		vmmemset(registers[SPI], FL);
 
+		if (!(interruptVector & 0x0010) &&
+			((interruptVector & 0x1000) >> 12) <= 1 &&
+			!interrupt)
+			goto protected_int;
+
 		FL &= ~PROTECTED;
+
+	protected_int:
+
 		FL |= INTERUPTED;
 
 		registers[IP] = ((vmmemget(registers[TP] + 2) << 8) | vmmemget(registers[TP] + 3));
@@ -481,7 +717,7 @@ static inline void vmExecute()
 	{
 		for (int i = 0; i < 16; i++)
 			printf("R%02d:0x%04X\n", i, registers[i]);
-		for (int i = 7; i > 0; i--)
+		for (int i = 7; i >= 0; i--)
 			printf("%u", ((FL >> i) & 1));
 		printf(":FL\n----------\n");
 	}
