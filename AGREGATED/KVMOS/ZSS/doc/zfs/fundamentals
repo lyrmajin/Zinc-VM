@@ -1,0 +1,62 @@
+Zinc File System 2 (ZFS2)
+
+ZFS is Kvmos modern, simple and memory efficient filesystem.
+
+ZFS uses files for everything. Files themself can be separated into more smaller pices, which are Metadata and Data itself.
+
+Metadata:
+
+ZFS has 2 main types of metadata, Directory Entries and File Entries, but they must not be confussed, they do not share similar structures nor behaviours.
+
+File Entries:
+
+A file entry is a pice of metadata that containts the name of the file, what we call a file in ZFS is just a cluster with a file metadata sector connected at the end of itself.
+
+File entries are separated into 2 variables. 1 null terminated char[] that containts the name of the file, and 1 unsigned char that containts the file size. is important to note that a file name must be 1 character long minimum, and maximum at 255.
+
+```
+Relative Address:
+[File Name String (1b-255b)]   [Name Size(1b)]
+^--- (File Offset)-(Name Size) ^--- (File Offset)
+RAM GROWS [------>]
+```
+
+Directory Entries:
+
+Directory entries, or entries are metadata sections that live inside a cluster, that tell the system where other files, or folders are. Behaviour you would expect from a folder.
+
+Each directory entry metadata is 24b in size, which is equivalent to 8 entries. As convenience, is preferible to set the first entry as the parent directory of the file, but this is not enforce at all by the API.
+
+```
+Relative Address:
+0x00 : [ (Entry Type)         ]
+
+0x01 : [ (Entry Address High) ]
+0x02 : [ (Entry Address Low)  ]
+```
+
+The entry type is mostly not enforced by the API, with 1 specific direct exception, which is the type 0, internally treathed as empty entry. And files and clusters, indirectly following the reason of not having a API enforced type entry number. But themself, as a type does exist, and it is impossed by the API.
+
+ZFS recommends the following entry numbers:
+
+    |Number     |Meaning
+    ---------------------
+Type|0          |Empty (API Number Enforced)
+    |1          |RW Directory
+    |2          |RO Directory
+    |3          |RW File
+    |4          |RO File
+    |5          |Cluster
+
+Data:
+
+ZFS only has 1 type of data, which are clusters. Cluster are section of memory taht containt 3 main blocks. 2 Bytes for the Cluster Chaining Pointer (ClusterPtr), 2 bytes for the size of data, and the following space is data itself.
+
+```
+Relative Address:
+[ClusterPtr(2b) ]                   [Data(0b-65490b)]       [Data Size(2b)]
+^--- (Cluster Offset)-(Data Size)-4 ^--- (Cluster Offset)-2 ^--- (Cluster Offset)
+RAM GROWS [------>]
+```
+
+It is important to note how fundamental is the address of the cluster pointer. If it points somewhere else than the cluster offset, the system will consider it a chain of clusters, and will follow any read/write process in the data block of the cluster, once size of cluster is reached for the current cluster. Is important to mention that when you using files, the cluster pointer shall point to the file metadata start, not the cluster itself, or else you will produce an error for bad address.
