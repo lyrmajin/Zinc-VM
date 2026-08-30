@@ -19,12 +19,16 @@ void putcemu(char c)
     printf("USART:[%c]\n", c);
 }
 
+unsigned short MW = 0;
+
 unsigned char ioget(unsigned short address)
 {
     switch (address)
     {
     case 0x00:
         return iointreg;
+    case 0x01:
+        return MW;
 
     case 0xC0:
         return usart[0].ucsra;
@@ -90,6 +94,9 @@ void ioset(unsigned short address, unsigned char value)
     {
     case 0x00:
         iointreg = value;
+        return;
+        case 0x01:
+        MW = value;
         return;
 
     case 0xC0:
